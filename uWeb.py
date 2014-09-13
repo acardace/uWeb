@@ -86,7 +86,10 @@ class HTTPhandler(http.server.BaseHTTPRequestHandler):
         py_cgi = False
 
         if self.path == "/":
-            toOpen = "index.html"
+            if os.path.exists("index.htm"):
+                toOpen = "index.htm"
+            elif os.path.exists("index.html"):
+                toOpen = "index.html"
         elif self.path.find(".py") > -1:
             py_cgi = True
 
