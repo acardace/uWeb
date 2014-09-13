@@ -35,7 +35,8 @@ def print_log(self):
     print(self.address_string()+" - - ["+self.log_date_time_string()+"] \""+self.command+" "+self.path+" "+self.request_version+"\" 200 -")
 
 
-def cgi_env(self,env,scriptname):
+def cgi_env(self, scriptname):
+    env = copy.deepcopy(os.environ)
     env['SERVER_SOFTWARE'] = self.version_string()
     env['SERVER_NAME'] = self.server.server_name
     env['GATEWAY_INTERFACE'] = 'CGI/1.1'
@@ -80,7 +81,83 @@ def getQueries(path):
         return False
     return queryString
 
+def run_cgi(self, toOpen):
+    #look for queries
+    env = cgi_env(self, toOpen)
+    self.wfile.flush()
+    pid = os.fork()
+    if pid == 0:
+        #prepare HEADER
+        cgi_header(self)
+        #LOG
+        print_log(self)
+        args = [toOpen]
+        try:
+            os.dup2( self.wfile.fileno() , 1)
+            os.execve(toOpen , args, env)
+            os._exit(0)
+        except:
+            os._exit(1)
+    else:
+        # Parent
+        os.waitpid(pid, 0)
+        self.wfile.flush()
+        return
+
+def serve_html_head(self, toOpen):
+    f = open(toOpen, 'r')
+    content = bytes( f.read(), 'utf-8')
+    self.send_response(200)
+    self.send_header("Server",SERVER_NAME )
+    self.send_header("Content-type", "text/html; charset=utf-8")
+    self.send_header("Content-Length",len(content) )
+    self.end_headers()
+    f.close()
+    return content
+
+def serve_html(self, toOpen):
+    content = serve_html_head(self, toOpen)
+    self.wfile.write( content )
+
+def not_found(self):
+    self.send_error( 404, self.responses[404][0])
+    self.end_headers()
+
+def show_help_message():
+    print("""uWeb 0.1
+
+    usage:
+    uWeb PORT WEBSITE_DIR
+
+    - PORT is the port on which you want to execute uWeb
+    - WEBSITE_DIR is the directory in which you have chosen to put all your .html/.py files.
+    """)
+
 class HTTPhandler(http.server.BaseHTTPRequestHandler):
+    def do_HEAD(self):
+        toOpen = local_path(self.path)
+        py_cgi = False
+
+        if self.path == "/":
+            if os.path.exists("index.htm"):
+                toOpen = "index.htm"
+            elif os.path.exists("index.html"):
+                toOpen = "index.html"
+        elif self.path.find(".py") > -1:
+            py_cgi = True
+
+        if os.path.exists(toOpen):
+            #CGI
+            if py_cgi == True:
+                cgi_header(self)
+                self.end_headers()
+            #PLAIN HTML
+            else:
+                serve_html_head(self, toOpen)
+        #The requested content does not exists
+        else:
+            not_found(self)
+
     def do_GET(self):
         toOpen = local_path(self.path)
         py_cgi = False
@@ -96,58 +173,13 @@ class HTTPhandler(http.server.BaseHTTPRequestHandler):
         if os.path.exists(toOpen):
             #CGI
             if py_cgi == True:
-                #look for queries
-                #TODO ENVIRON STUFF FOR CGI
-                env = copy.deepcopy(os.environ)
-                env = cgi_env(self, env, toOpen)
-
-                self.wfile.flush()
-                pid = os.fork()
-                if pid == 0:
-                    #prepare HEADER
-                    cgi_header(self)
-                    #LOG
-                    print_log(self)
-
-                    args = [toOpen]
-                    try:
-                        os.dup2( self.wfile.fileno() , 1)
-                        os.execve(toOpen , args, env)
-                        os._exit(0)
-                    except:
-                        os._exit(1)
-                else:
-                    # Parent
-                    os.wait()
-                    self.wfile.flush()
-                    return
-
+                run_cgi(self, toOpen)
             #PLAIN HTML
             else:
-                f = open(toOpen, 'r')
-                content = bytes( f.read(), 'utf-8')
-                self.send_response(200)
-                self.send_header("Server",SERVER_NAME )
-                self.send_header("Content-type", "text/html; charset=utf-8")
-                self.send_header("Content-Length",len(content) )
-                self.end_headers()
-                f.close()
-                self.wfile.write( content )
-
+                serve_html(self, toOpen)
         #The requested content does not exists
         else:
-            self.send_error( 404, self.responses[404][0])
-            self.end_headers()
-
-def show_help_message():
-    print("""uWeb 0.1
-
-    usage:
-    uWeb PORT WEBSITE_DIR
-
-    - PORT is the port on which you want to execute uWeb
-    - WEBSITE_DIR is the directory in which you have chosen to put all your .html/.py files.
-    """)
+            not_found(self)
 
 def runDaemon(server_class=http.server.HTTPServer, handler_class=HTTPhandler):
     if len(sys.argv) != 3:
