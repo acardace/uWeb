@@ -21,4 +21,4 @@ I'm sharing this piece of code with the hope that it will be useful to someone o
 Have fun :)
 
 -------------------------------------------------
-Copyright Antonio Cardace 2014, anto.cardace@gmail.com
+Copyright **Antonio Cardace** 2014, anto.cardace@gmail.com
