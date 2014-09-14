@@ -3,7 +3,7 @@ uWeb
 
 uWeb, a minimal WebServer written in Python.
 
-uWeb supports python CGI scripts, and at the moment only GET requests are supported.
+uWeb supports python CGI scripts, uses the HTTP/1.1 protocol and GET,HEAD and POST requests are supported.
 
 ##This is how to use it:
 
