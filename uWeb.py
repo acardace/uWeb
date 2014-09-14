@@ -24,7 +24,7 @@ import sys
 import copy
 import mimetypes
 
-SERVER_NAME="uWeb 0.1"
+SERVER_NAME="uWeb 0.2"
 PROT_VERSION="HTTP/1.1"
 BLOCK_SIZE=1024
 
