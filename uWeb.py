@@ -26,9 +26,22 @@ import mimetypes
 
 SERVER_NAME="uWeb 0.1"
 PROT_VERSION="HTTP/1.1"
+BLOCK_SIZE=1024
 
-def cgi_header(self):
-    self.wfile.write( bytes( self.protocol_version+" 200 OK\n" ,"utf-8") )
+def look_for_redirect(content):
+    i = content.lower().find(b"location:")
+    if i > -1:
+        return True
+    else:
+        return False
+
+def cgi_header(self, content=None):
+    if content!= None:
+        redirect = look_for_redirect( str(content).encode('utf-8') )
+    if not redirect:
+        self.wfile.write( bytes( self.protocol_version+" 200 OK\n" ,"utf-8") )
+    else:
+        self.wfile.write( bytes( self.protocol_version+" 303 See other\n" ,"utf-8") )
     self.wfile.write( bytes( "Server: "+self.server_version+"\n" ,"utf-8") )
     self.wfile.write( bytes("Date: "+self.date_time_string()+"\n","utf-8"))
 
@@ -96,8 +109,6 @@ def run_cgi(self, toOpen):
     os.set_inheritable(w, True)
     pid = os.fork()
     if pid == 0:
-        #prepare HEADER
-        cgi_header(self)
         #LOG
         print_log(self)
         args = [toOpen]
@@ -112,12 +123,14 @@ def run_cgi(self, toOpen):
         os.waitpid(pid, 0)
         os.close(w)
         content = ""
-        buf = os.read(r, 1024).decode("utf-8")
+        buf = os.read(r, BLOCK_SIZE).decode("utf-8")
         while buf != "":
             content += buf
-            buf = os.read(r, 1024).decode("utf-8")
+            buf = os.read(r, BLOCK_SIZE).decode("utf-8")
         os.close(r)
-        length = str( get_content_length(content.encode("utf-8") ) )
+        length =  str( get_content_length(content.encode("utf-8")))
+        #prepare HEADER
+        cgi_header(self, content)
         self.wfile.write( bytes("Content-Length: "+length+"\n", "utf-8") )
         self.wfile.write(content.encode("utf-8"))
         self.wfile.flush()
