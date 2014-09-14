@@ -22,6 +22,7 @@ import http.server
 import os
 import sys
 import copy
+import mimetypes
 
 SERVER_NAME="uWeb 0.1"
 PROT_VERSION="HTTP/1.1"
@@ -122,18 +123,21 @@ def run_cgi(self, toOpen):
         self.wfile.flush()
         return
 
-def serve_html_head(self, toOpen):
+def serve_head(self, toOpen, mime, encoding):
     f = open(toOpen, 'rb')
     content = f.read()
     self.send_response(200)
-    self.send_header("Content-type", "text/html; charset=utf-8")
+    if mime != None:
+        self.send_header("Content-type", mime)
     self.send_header("Content-Length",len(content) )
+    if encoding != None:
+        self.send_header("Content-Encoding", encoding)
     self.end_headers()
     f.close()
     return content
 
-def serve_html(self, toOpen):
-    content = serve_html_head(self, toOpen)
+def serve(self, toOpen, mime, encoding):
+    content = serve_head(self, toOpen, mime, encoding)
     self.wfile.write( content )
 
 def not_found(self):
@@ -149,6 +153,10 @@ def show_help_message():
     - PORT is the port on which you want to execute uWeb
     - WEBSITE_DIR is the directory in which you have chosen to put all your .html/.py files.
     """)
+
+def guess_type(path):
+    (mimetype,encoding) = mimetypes.guess_type(path)
+    return (mimetype,encoding)
 
 class HTTPhandler(http.server.BaseHTTPRequestHandler):
 
@@ -171,7 +179,8 @@ class HTTPhandler(http.server.BaseHTTPRequestHandler):
                 self.wfile.write( bytes("\n","utf-8") )
             #PLAIN HTML
             else:
-                serve_html_head(self, toOpen)
+                mime,encoding = guess_type(toOpen)
+                serve_head(self, toOpen, mime, encoding)
         #The requested content does not exists
         else:
             not_found(self)
@@ -194,7 +203,8 @@ class HTTPhandler(http.server.BaseHTTPRequestHandler):
                 run_cgi(self, toOpen)
             #PLAIN HTML
             else:
-                serve_html(self, toOpen)
+                mime, encoding = guess_type(toOpen)
+                serve(self, toOpen, mime, encoding)
         #The requested content does not exists
         else:
             not_found(self)
