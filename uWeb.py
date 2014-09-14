@@ -114,6 +114,7 @@ def run_cgi(self, toOpen):
         args = [toOpen]
         try:
             os.dup2( w , 1)
+            os.dup2( self.rfile.fileno() , 0)
             os.execve(toOpen , args, env)
             os._exit(0)
         except:
@@ -172,6 +173,8 @@ def guess_type(path):
     return (mimetype,encoding)
 
 class HTTPhandler(http.server.BaseHTTPRequestHandler):
+    #to make self.rfile unbuffered, otherwise we would block while reading on it
+    rbufsize=0
 
     def do_HEAD(self):
         toOpen = local_path(self.path)
@@ -221,6 +224,9 @@ class HTTPhandler(http.server.BaseHTTPRequestHandler):
         #The requested content does not exists
         else:
             not_found(self)
+
+    def do_POST(self):
+       self.do_GET()
 
 def runDaemon(server_class=http.server.HTTPServer, handler_class=HTTPhandler):
     if len(sys.argv) != 3:
