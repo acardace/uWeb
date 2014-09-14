@@ -24,10 +24,11 @@ import sys
 import copy
 
 SERVER_NAME="uWeb 0.1"
+PROT_VERSION="HTTP/1.1"
 
 def cgi_header(self):
-    self.wfile.write( bytes( "HTTP/1.1 200 OK\n" ,"utf-8") )
-    self.wfile.write( bytes( "Server: "+SERVER_NAME+"\n" ,"utf-8") )
+    self.wfile.write( bytes( self.protocol_version+" 200 OK\n" ,"utf-8") )
+    self.wfile.write( bytes( "Server: "+self.server_version+"\n" ,"utf-8") )
     self.wfile.write( bytes("Date: "+self.date_time_string()+"\n","utf-8"))
 
 
@@ -38,7 +39,7 @@ def print_log(self):
 def cgi_env(self, scriptname):
     env = copy.deepcopy(os.environ)
     env['SERVER_SOFTWARE'] = self.version_string()
-    env['SERVER_NAME'] = self.server.server_name
+    env['SERVER_NAME'] = self.server_version
     env['GATEWAY_INTERFACE'] = 'CGI/1.1'
     env['SERVER_PROTOCOL'] = self.protocol_version
     env['SERVER_PORT'] = str(self.server.server_port)
@@ -81,10 +82,17 @@ def getQueries(path):
         return False
     return queryString
 
+def get_content_length(content):
+    i = content.find(b"\n\n")
+    return len(content[i+2:])
+
 def run_cgi(self, toOpen):
     #look for queries
     env = cgi_env(self, toOpen)
     self.wfile.flush()
+    #prepare pipe
+    r,w = os.pipe()
+    os.set_inheritable(w, True)
     pid = os.fork()
     if pid == 0:
         #prepare HEADER
@@ -93,7 +101,7 @@ def run_cgi(self, toOpen):
         print_log(self)
         args = [toOpen]
         try:
-            os.dup2( self.wfile.fileno() , 1)
+            os.dup2( w , 1)
             os.execve(toOpen , args, env)
             os._exit(0)
         except:
@@ -101,6 +109,16 @@ def run_cgi(self, toOpen):
     else:
         # Parent
         os.waitpid(pid, 0)
+        os.close(w)
+        content = ""
+        buf = os.read(r, 1024).decode("utf-8")
+        while buf != "":
+            content += buf
+            buf = os.read(r, 1024).decode("utf-8")
+        os.close(r)
+        length = str( get_content_length(content.encode("utf-8") ) )
+        self.wfile.write( bytes("Content-Length: "+length+"\n", "utf-8") )
+        self.wfile.write(content.encode("utf-8"))
         self.wfile.flush()
         return
 
@@ -108,7 +126,6 @@ def serve_html_head(self, toOpen):
     f = open(toOpen, 'r')
     content = bytes( f.read(), 'utf-8')
     self.send_response(200)
-    self.send_header("Server",SERVER_NAME )
     self.send_header("Content-type", "text/html; charset=utf-8")
     self.send_header("Content-Length",len(content) )
     self.end_headers()
@@ -134,6 +151,7 @@ def show_help_message():
     """)
 
 class HTTPhandler(http.server.BaseHTTPRequestHandler):
+
     def do_HEAD(self):
         toOpen = local_path(self.path)
         py_cgi = False
@@ -150,7 +168,7 @@ class HTTPhandler(http.server.BaseHTTPRequestHandler):
             #CGI
             if py_cgi == True:
                 cgi_header(self)
-                self.end_headers()
+                self.wfile.write( bytes("\n","utf-8") )
             #PLAIN HTML
             else:
                 serve_html_head(self, toOpen)
@@ -190,6 +208,9 @@ def runDaemon(server_class=http.server.HTTPServer, handler_class=HTTPhandler):
     PORT=int(sys.argv[1])
     server_addr = ("",PORT)
     httpd = server_class(server_addr, handler_class)
+    #setting server options
+    handler_class.server_version = SERVER_NAME
+    handler_class.protocol_version = PROT_VERSION
     os.chdir(DEFAULT_DIR)
     try:
         print("Starting uWeb up on port",PORT,"!")
