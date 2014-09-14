@@ -123,8 +123,8 @@ def run_cgi(self, toOpen):
         return
 
 def serve_html_head(self, toOpen):
-    f = open(toOpen, 'r')
-    content = bytes( f.read(), 'utf-8')
+    f = open(toOpen, 'rb')
+    content = f.read()
     self.send_response(200)
     self.send_header("Content-type", "text/html; charset=utf-8")
     self.send_header("Content-Length",len(content) )
