@@ -185,7 +185,7 @@ class HTTPhandler(http.server.BaseHTTPRequestHandler):
                 toOpen = "index.htm"
             elif os.path.exists("index.html"):
                 toOpen = "index.html"
-        elif self.path.find(".py") > -1:
+        elif self.path.find(".htm") < 0 or self.path.find(".html") < 0:
             py_cgi = True
 
         if os.path.exists(toOpen):
@@ -210,12 +210,12 @@ class HTTPhandler(http.server.BaseHTTPRequestHandler):
                 toOpen = "index.htm"
             elif os.path.exists("index.html"):
                 toOpen = "index.html"
-        elif self.path.find(".py") > -1:
+        elif self.path.find(".htm") < 0 or self.path.find(".html") < 0:
             py_cgi = True
 
         if os.path.exists(toOpen):
             #CGI
-            if py_cgi == True:
+            if py_cgi == True and os.access(toOpen, os.X_OK):
                 run_cgi(self, toOpen)
             #PLAIN HTML
             else:
