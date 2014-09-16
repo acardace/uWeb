@@ -19,6 +19,7 @@
 '''
 
 import http.server
+import socketserver
 import os
 import sys
 import copy
@@ -153,6 +154,7 @@ def serve_head(self, toOpen, mime, encoding):
 def serve(self, toOpen, mime, encoding):
     content = serve_head(self, toOpen, mime, encoding)
     self.wfile.write( content )
+    self.wfile.flush()
 
 def not_found(self):
     self.send_error( 404, self.responses[404][0])
@@ -172,6 +174,15 @@ def guess_type(path):
     (mimetype,encoding) = mimetypes.guess_type(path)
     return (mimetype,encoding)
 
+def isCGI(self, path):
+    if self.path.find(".js") > -1:
+        return False
+    if self.path.find(".css") > -1:
+        return False
+    if self.path.find(".htm") >-1 or self.path.find(".html") >-1:
+        return False
+    return True
+
 class HTTPhandler(http.server.BaseHTTPRequestHandler):
     #to make self.rfile unbuffered, otherwise we would block while reading on it
     rbufsize=0
@@ -185,7 +196,7 @@ class HTTPhandler(http.server.BaseHTTPRequestHandler):
                 toOpen = "index.htm"
             elif os.path.exists("index.html"):
                 toOpen = "index.html"
-        elif self.path.find(".htm") < 0 or self.path.find(".html") < 0:
+        elif isCGI(self,toOpen):
             py_cgi = True
 
         if os.path.exists(toOpen):
@@ -210,25 +221,34 @@ class HTTPhandler(http.server.BaseHTTPRequestHandler):
                 toOpen = "index.htm"
             elif os.path.exists("index.html"):
                 toOpen = "index.html"
-        elif self.path.find(".htm") < 0 or self.path.find(".html") < 0:
+            else:
+                not_found(self)
+                return
+        elif isCGI(self,toOpen):
             py_cgi = True
 
         if os.path.exists(toOpen):
             #CGI
             if py_cgi == True and os.access(toOpen, os.X_OK):
                 run_cgi(self, toOpen)
+                return
             #PLAIN HTML
             else:
                 mime, encoding = guess_type(toOpen)
                 serve(self, toOpen, mime, encoding)
+                return
         #The requested content does not exists
         else:
             not_found(self)
+            return
 
     def do_POST(self):
-       self.do_GET()
+        self.do_GET()
 
-def runDaemon(server_class=http.server.HTTPServer, handler_class=HTTPhandler):
+class ThreadingTCPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+    pass
+
+def runDaemon(server_class=ThreadingTCPServer, handler_class=HTTPhandler):
     if len(sys.argv) != 3:
         show_help_message()
         sys.exit()

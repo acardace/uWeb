@@ -1,7 +1,7 @@
 uWeb
 ====
 
-uWeb, a minimal WebServer written in Python.
+uWeb, a minimal multithreaded WebServer written in Python.
 
 uWeb supports almost any kind of interpreted or compiled CGI scripts (no PHP), uses the HTTP/1.1 protocol and GET,HEAD and POST requests are supported.
 
